@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AmparaPet — Admin (teste)</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<h1>Área administrativa</h1>
+<p class="erro" id="erro"></p>
+<p class="ok" id="ok"></p>
+
+<!-- Login (RF07) -->
+<form id="form-login" class="oculto">
+  <fieldset><legend>Login</legend>
+    <label>E-mail <input name="email" type="email" required></label>
+    <label>Senha <input name="senha" type="password" required></label>
+    <button>Entrar</button>
+  </fieldset>
+</form>
+
+<div id="logado" class="oculto">
+  <p>Logado como <b id="usuario-nome"></b> · <button id="sair">Sair</button></p>
+
+  <!-- Painel (RF14) -->
+  <fieldset><legend>Painel</legend><div id="painel"></div></fieldset>
+
+  <!-- Lista de animais -->
+  <fieldset><legend>Animais</legend>
+    <label>Status <select id="filtro-status"><option value="">Todos</option><option value="DISPONIVEL">Disponível</option><option value="EM_PROCESSO">Em processo</option><option value="ADOTADO">Adotado</option></select></label>
+    <label>Busca <input id="filtro-busca"></label>
+    <button id="btn-filtrar">Filtrar</button>
+    <button id="btn-novo">+ Novo animal</button>
+    <table><thead><tr><th>#</th><th>Nome</th><th>Espécie</th><th>Status</th><th>Fotos</th><th>Cliques</th><th>Ações</th></tr></thead>
+      <tbody id="lista"></tbody></table>
+  </fieldset>
+
+  <!-- Cadastro / edição (RF01 / RF09) -->
+  <form id="form-animal" class="oculto">
+    <fieldset><legend id="titulo-animal">Animal</legend>
+      <label>Nome* <input name="nome" required maxlength="80"></label>
+      <label>Espécie* <select name="especie"><option value="CAO">Cão</option><option value="GATO">Gato</option></select></label>
+      <label>Raça* <input name="raca" value="SRD" required></label>
+      <label>Sexo* <select name="sexo"><option value="MACHO">Macho</option><option value="FEMEA">Fêmea</option></select></label>
+      <label>Porte* <select name="porte"><option value="PEQUENO">Pequeno</option><option value="MEDIO">Médio</option><option value="GRANDE">Grande</option></select></label>
+      <label>Nascimento aprox. (mês/ano) <input name="data_nascimento" type="month"></label>
+      <label>Cor <input name="cor"></label>
+      <label>Status <select name="status"><option value="DISPONIVEL">Disponível</option><option value="EM_PROCESSO">Em processo</option><option value="ADOTADO">Adotado</option></select></label>
+      <label><input type="checkbox" name="vacinado"> Vacinado</label>
+      <label><input type="checkbox" name="castrado"> Castrado</label>
+      <label style="display:block">Vacinas (detalhes) <textarea name="vacinas_detalhes" rows="2"></textarea></label>
+      <label style="display:block">Comportamento <textarea name="comportamento" rows="2"></textarea></label>
+      <label style="display:block">Necessidades especiais <textarea name="necessidades_especiais" rows="2"></textarea></label>
+      <label style="display:block">Descrição <textarea name="descricao" rows="3"></textarea></label>
+      <button>Salvar</button> <button type="button" id="cancelar">Fechar</button>
+
+      <!-- Fotos (RF04) -->
+      <div id="area-fotos" class="oculto">
+        <h3>Fotos (a primeira é a principal)</h3>
+        <div class="fotos" id="fotos"></div>
+        <p>
+          <input type="file" id="arquivos" multiple accept="image/jpeg,image/png,image/webp">
+          <button type="button" id="enviar-fotos">Enviar fotos</button>
+        </p>
+        <div class="fotos" id="previa"></div>
+      </div>
+      <div id="area-historico" class="oculto"><h3>Histórico de status</h3><table id="historico"></table></div>
+    </fieldset>
+  </form>
+
+  <!-- Dados do abrigo (RF12 / RF13) -->
+  <form id="form-abrigo">
+    <fieldset><legend>Dados do abrigo</legend><div id="campos-abrigo"></div><button>Salvar dados do abrigo</button></fieldset>
+  </form>
+
+  <!-- Usuários -->
+  <fieldset><legend>Administradores</legend>
+    <table><tbody id="usuarios"></tbody></table>
+    <form id="form-usuario">
+      <label>Nome <input name="nome" required></label>
+      <label>E-mail <input name="email" type="email" required></label>
+      <label>Senha <input name="senha" type="password" minlength="8" required></label>
+      <button>Adicionar administrador</button>
+    </form>
+    <form id="form-senha">
+      <label>Senha atual <input name="senha_atual" type="password" required></label>
+      <label>Nova senha <input name="senha_nova" type="password" minlength="8" required></label>
+      <button>Trocar minha senha</button>
+    </form>
+  </fieldset>
+</div>
+
+<script src="comum.js"></script>
+<script>
+nav();
+const $ = id => document.getElementById(id);
+const CAMPOS_ABRIGO = ["nome_abrigo", "endereco", "cidade", "horario_funcionamento", "whatsapp", "instagram",
+  "como_adotar", "documentos_adocao", "mensagem_interesse", "url_pagina_animal"];
+let animalAtual = null;
+let usuarioLogado = null;
+
+function mensagem(ok, erro = "") { $("ok").textContent = ok; $("erro").textContent = erro; }
+async function tentar(fn) {
+  try { mensagem(""); await fn(); }
+  catch (e) {
+    if (e.status === 401) { localStorage.removeItem("amparapet_token"); mostrarLogin(); }
+    mensagem("", e.message);
+  }
+}
+
+function mostrarLogin() { $("form-login").classList.remove("oculto"); $("logado").classList.add("oculto"); }
+
+async function iniciar() {
+  if (!token()) return mostrarLogin();
+  await tentar(async () => {
+    usuarioLogado = await api("/api/auth/eu");
+    $("usuario-nome").textContent = `${usuarioLogado.nome} (${usuarioLogado.email})`;
+    $("form-login").classList.add("oculto");
+    $("logado").classList.remove("oculto");
+    await opcoes();
+    await Promise.all([carregarPainel(), carregarLista(), carregarAbrigo(), carregarUsuarios()]);
+  });
+}
+
+$("form-login").onsubmit = e => {
+  e.preventDefault();
+  tentar(async () => {
+    const f = Object.fromEntries(new FormData(e.target));
+    const r = await api("/api/auth/login", { method: "POST", json: f });
+    localStorage.setItem("amparapet_token", r.token);
+    e.target.reset();
+    iniciar();
+  });
+};
+
+$("sair").onclick = () => tentar(async () => {
+  await api("/api/auth/logout", { method: "POST" });
+  localStorage.removeItem("amparapet_token");
+  mostrarLogin();
+});
+
+async function carregarPainel() {
+  const p = await api("/api/admin/painel");
+  $("painel").innerHTML = `Total: <b>${p.total}</b> · Disponíveis: <b>${p.disponiveis}</b> ·
+    Em processo: <b>${p.em_processo}</b> · Adotados: <b>${p.adotados}</b> · Cliques em "tenho interesse": <b>${p.cliques_interesse_total}</b>
+    ${p.mais_procurados.length ? "<br>Mais procurados: " + p.mais_procurados.map(m => `${esc(m.nome)} (${m.cliques})`).join(", ") : ""}`;
+}
+
+async function carregarLista() {
+  const params = new URLSearchParams({ por_pagina: 100 });
+  if ($("filtro-status").value) params.set("status", $("filtro-status").value);
+  if ($("filtro-busca").value) params.set("busca", $("filtro-busca").value);
+  const r = await api("/api/admin/animais?" + params);
+  $("lista").innerHTML = r.itens.map(a => `
+    <tr><td>${a.id}</td><td><a href="animal.html?id=${a.id}" target="_blank">${esc(a.nome)}</a></td>
+      <td>${rotulo("especie", a.especie)}</td>
+      <td><select data-status="${a.id}">${Object.entries(OPCOES.status).map(([v, t]) =>
+        `<option value="${v}" ${v === a.status ? "selected" : ""}>${t}</option>`).join("")}</select></td>
+      <td>${a.fotos.length}</td><td>${a.cliques_interesse}</td>
+      <td><button data-editar="${a.id}">Editar</button> <button data-excluir="${a.id}" data-nome="${esc(a.nome)}">Excluir</button></td></tr>`).join("");
+}
+$("btn-filtrar").onclick = () => tentar(carregarLista);
+
+$("lista").onchange = e => {
+  const id = e.target.dataset.status;
+  if (!id) return;
+  const observacao = prompt("Observação para o histórico (opcional):") || null;
+  tentar(async () => {
+    await api(`/api/admin/animais/${id}/status`, { method: "PATCH", json: { status: e.target.value, observacao } });
+    mensagem("Status atualizado.");
+    await Promise.all([carregarPainel(), carregarLista()]);
+    if (animalAtual && animalAtual.id == id) abrirAnimal(id);
+  });
+};
+
+$("lista").onclick = e => {
+  const { editar, excluir, nome } = e.target.dataset;
+  if (editar) tentar(() => abrirAnimal(editar));
+  if (excluir && confirm(`Excluir "${nome}" definitivamente? Fotos e histórico também serão apagados.`)) {
+    tentar(async () => {
+      await api(`/api/admin/animais/${excluir}`, { method: "DELETE" });
+      if (animalAtual && animalAtual.id == excluir) fecharAnimal();
+      mensagem("Animal excluído.");
+      await Promise.all([carregarPainel(), carregarLista()]);
+    });
+  }
+};
+
+// ----- Formulário do animal -----
+const form = $("form-animal");
+
+function fecharAnimal() { animalAtual = null; form.classList.add("oculto"); }
+$("cancelar").onclick = fecharAnimal;
+
+$("btn-novo").onclick = () => {
+  animalAtual = null;
+  form.reset();
+  $("titulo-animal").textContent = "Novo animal";
+  $("area-fotos").classList.add("oculto");
+  $("area-historico").classList.add("oculto");
+  form.classList.remove("oculto");
+  form.nome.focus();
+};
+
+async function abrirAnimal(id) {
+  const a = await api("/api/admin/animais/" + id);
+  animalAtual = a;
+  $("titulo-animal").textContent = `Editando #${a.id} — ${a.nome}`;
+  for (const el of form.elements) {
+    if (!el.name || !(el.name in a)) continue;
+    if (el.type === "checkbox") el.checked = a[el.name];
+    else if (el.name === "data_nascimento") el.value = a.data_nascimento ? a.data_nascimento.slice(0, 7) : "";
+    else el.value = a[el.name] ?? "";
+  }
+  $("fotos").innerHTML = a.fotos.map((f, i) => `
+    <figure><img src="${f.miniatura_url}" alt="">
+      <button type="button" data-mover="${i}" data-dir="-1" ${i === 0 ? "disabled" : ""}>◀</button>
+      <button type="button" data-mover="${i}" data-dir="1" ${i === a.fotos.length - 1 ? "disabled" : ""}>▶</button>
+      <button type="button" data-remover-foto="${f.id}">✕</button></figure>`).join("") || "Nenhuma foto.";
+  $("previa").innerHTML = "";
+  $("arquivos").value = "";
+  $("area-fotos").classList.remove("oculto");
+  const h = await api(`/api/admin/animais/${id}/historico`);
+  $("historico").innerHTML = "<tr><th>Data</th><th>De</th><th>Para</th><th>Por</th><th>Obs.</th></tr>" + h.map(x =>
+    `<tr><td>${new Date(x.criado_em).toLocaleString("pt-BR")}</td><td>${x.status_anterior ? rotulo("status", x.status_anterior) : "-"}</td>
+     <td>${rotulo("status", x.status_novo)}</td><td>${esc(x.usuario_nome) || "-"}</td><td>${esc(x.observacao) || ""}</td></tr>`).join("");
+  $("area-historico").classList.remove("oculto");
+  form.classList.remove("oculto");
+}
+
+form.onsubmit = e => {
+  e.preventDefault();
+  const dados = {};
+  for (const el of form.elements) {
+    if (!el.name) continue;
+    if (el.type === "checkbox") dados[el.name] = el.checked;
+    else if (el.name === "data_nascimento") dados[el.name] = el.value ? el.value + "-01" : null;
+    else dados[el.name] = el.value;
+  }
+  tentar(async () => {
+    const a = animalAtual
+      ? await api(`/api/admin/animais/${animalAtual.id}`, { method: "PATCH", json: dados })
+      : await api("/api/admin/animais", { method: "POST", json: dados });
+    mensagem(animalAtual ? "Animal atualizado." : "Animal cadastrado. Agora envie as fotos.");
+    await Promise.all([carregarPainel(), carregarLista(), abrirAnimal(a.id)]);
+  });
+};
+
+// Pré-visualização antes de enviar (RF04)
+$("arquivos").onchange = () => {
+  $("previa").innerHTML = "";
+  for (const f of $("arquivos").files) {
+    const kb = Math.round(f.size / 1024);
+    $("previa").insertAdjacentHTML("beforeend",
+      `<figure><img src="${URL.createObjectURL(f)}" alt=""><small>${esc(f.name)}<br>${kb} KB${f.size > 5 * 1024 * 1024 ? " — <b class='erro'>maior que 5 MB</b>" : ""}</small></figure>`);
+  }
+};
+
+$("enviar-fotos").onclick = () => tentar(async () => {
+  const arquivos = $("arquivos").files;
+  if (!arquivos.length) throw new Error("Escolha ao menos uma foto");
+  const fd = new FormData();
+  for (const f of arquivos) fd.append("fotos", f);
+  await api(`/api/admin/animais/${animalAtual.id}/fotos`, { method: "POST", body: fd });
+  mensagem("Fotos enviadas.");
+  await Promise.all([abrirAnimal(animalAtual.id), carregarLista()]);
+});
+
+$("fotos").onclick = e => {
+  const { removerFoto, mover, dir } = e.target.dataset;
+  if (removerFoto && confirm("Remover esta foto?")) tentar(async () => {
+    await api(`/api/admin/fotos/${removerFoto}`, { method: "DELETE" });
+    await Promise.all([abrirAnimal(animalAtual.id), carregarLista()]);
+  });
+  if (mover !== undefined) tentar(async () => {
+    const ids = animalAtual.fotos.map(f => f.id);
+    const i = +mover, j = i + +dir;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    await api(`/api/admin/animais/${animalAtual.id}/fotos/ordem`, { method: "PUT", json: { ids } });
+    await abrirAnimal(animalAtual.id);
+  });
+};
+
+// ----- Dados do abrigo -----
+async function carregarAbrigo() {
+  const a = await api("/api/admin/abrigo");
+  $("campos-abrigo").innerHTML = CAMPOS_ABRIGO.map(c => `
+    <label style="display:block">${c}${c === "whatsapp" ? " (só números com 55 + DDD, ex.: 5543999998888)" : ""}
+      <textarea name="${c}" rows="${["como_adotar", "documentos_adocao"].includes(c) ? 4 : 1}">${esc(a[c])}</textarea></label>`).join("");
+}
+$("form-abrigo").onsubmit = e => {
+  e.preventDefault();
+  tentar(async () => {
+    await api("/api/admin/abrigo", { method: "PUT", json: Object.fromEntries(new FormData(e.target)) });
+    mensagem("Dados do abrigo salvos.");
+  });
+};
+
+// ----- Usuários -----
+async function carregarUsuarios() {
+  const us = await api("/api/admin/usuarios");
+  $("usuarios").innerHTML = "<tr><th>Nome</th><th>E-mail</th><th>Ativo</th><th></th></tr>" + us.map(u => `
+    <tr><td>${esc(u.nome)}</td><td>${esc(u.email)}</td><td>${simNao(u.ativo)}</td>
+    <td>${u.id === usuarioLogado.id ? "(você)" : `
+      <button data-ativo="${u.id}" data-valor="${!u.ativo}">${u.ativo ? "Desativar" : "Ativar"}</button>
+      <button data-excluir-usuario="${u.id}">Excluir</button>`}</td></tr>`).join("");
+}
+$("usuarios").onclick = e => {
+  const { ativo, valor, excluirUsuario } = e.target.dataset;
+  if (ativo) tentar(async () => {
+    await api(`/api/admin/usuarios/${ativo}`, { method: "PATCH", json: { ativo: valor === "true" } });
+    await carregarUsuarios();
+  });
+  if (excluirUsuario && confirm("Excluir este administrador?")) tentar(async () => {
+    await api(`/api/admin/usuarios/${excluirUsuario}`, { method: "DELETE" });
+    await carregarUsuarios();
+  });
+};
+$("form-usuario").onsubmit = e => {
+  e.preventDefault();
+  tentar(async () => {
+    await api("/api/admin/usuarios", { method: "POST", json: Object.fromEntries(new FormData(e.target)) });
+    e.target.reset();
+    mensagem("Administrador adicionado.");
+    await carregarUsuarios();
+  });
+};
+$("form-senha").onsubmit = e => {
+  e.preventDefault();
+  tentar(async () => {
+    await api("/api/auth/senha", { method: "PUT", json: Object.fromEntries(new FormData(e.target)) });
+    e.target.reset();
+    mensagem("Senha alterada.");
+  });
+};
+
+iniciar();
+</script>
+</body>
+</html>

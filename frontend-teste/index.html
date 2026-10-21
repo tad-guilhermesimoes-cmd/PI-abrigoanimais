@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AmparaPet — Vitrine (teste)</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<h1>Vitrine de animais</h1>
+<form id="filtros">
+  <fieldset><legend>Filtros (RF05)</legend>
+    <label>Espécie <select name="especie"><option value="">Todas</option><option value="CAO">Cão</option><option value="GATO">Gato</option></select></label>
+    <label>Porte <select name="porte"><option value="">Todos</option><option value="PEQUENO">Pequeno</option><option value="MEDIO">Médio</option><option value="GRANDE">Grande</option></select></label>
+    <label>Sexo <select name="sexo"><option value="">Todos</option><option value="MACHO">Macho</option><option value="FEMEA">Fêmea</option></select></label>
+    <label>Castrado <select name="castrado"><option value="">Tanto faz</option><option value="true">Sim</option><option value="false">Não</option></select></label>
+    <label>Vacinado <select name="vacinado"><option value="">Tanto faz</option><option value="true">Sim</option><option value="false">Não</option></select></label>
+    <label>Status <select name="status"><option value="">Todos</option><option value="DISPONIVEL">Disponível</option><option value="EM_PROCESSO">Em processo</option></select></label>
+    <label>Busca <input name="busca" placeholder="nome, raça ou cor"></label>
+    <button>Filtrar</button>
+  </fieldset>
+</form>
+<p id="total"></p>
+<div class="grade" id="grade"></div>
+<p><button id="anterior">« Anterior</button> <span id="pag"></span> <button id="proxima">Próxima »</button></p>
+<p class="erro" id="erro"></p>
+
+<script src="comum.js"></script>
+<script>
+nav();
+let pagina = 1;
+
+async function carregar() {
+  const params = new URLSearchParams();
+  for (const [k, v] of new FormData(document.getElementById("filtros"))) if (v) params.append(k, v);
+  params.set("pagina", pagina);
+  params.set("por_pagina", 8);
+  try {
+    await opcoes();
+    const r = await api("/api/animais?" + params);
+    document.getElementById("total").textContent = `${r.total} animal(is) encontrado(s)`;
+    document.getElementById("grade").innerHTML = r.itens.map(a => `
+      <div class="card">
+        ${a.foto_principal ? `<img src="${a.foto_principal.miniatura_url}" alt="Foto de ${esc(a.nome)}">` : `<div class="sem-foto">sem foto</div>`}
+        <b><a href="animal.html?id=${a.id}">${esc(a.nome)}</a></b><br>
+        ${rotulo("especie", a.especie)} · ${esc(a.raca)} · ${rotulo("porte", a.porte)}<br>
+        ${a.idade || "idade não informada"}<br>
+        Castrado: ${simNao(a.castrado)} · Vacinado: ${simNao(a.vacinado)}<br>
+        <i>${rotulo("status", a.status)}</i>
+      </div>`).join("");
+    const paginas = Math.max(1, Math.ceil(r.total / r.por_pagina));
+    document.getElementById("pag").textContent = `Página ${pagina} de ${paginas}`;
+    document.getElementById("anterior").disabled = pagina <= 1;
+    document.getElementById("proxima").disabled = pagina >= paginas;
+  } catch (e) { document.getElementById("erro").textContent = e.message; }
+}
+
+document.getElementById("filtros").onsubmit = e => { e.preventDefault(); pagina = 1; carregar(); };
+document.getElementById("anterior").onclick = () => { pagina--; carregar(); };
+document.getElementById("proxima").onclick = () => { pagina++; carregar(); };
+carregar();
+rodape();
+</script>
+</body>
+</html>

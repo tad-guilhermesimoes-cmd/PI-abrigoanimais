@@ -1,0 +1,23 @@
+/* Interface SÓ PARA TESTE da API. O front-end oficial é feito à parte. */
+body { font-family: system-ui, sans-serif; max-width: 1000px; margin: 0 auto; padding: 12px; background: #fafafa; color: #222; }
+nav { display: flex; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid #ccc; margin-bottom: 12px; }
+nav a { color: #06c; }
+.aviso { background: #fff3cd; border: 1px solid #e0c060; padding: 6px 10px; font-size: 13px; margin-bottom: 10px; }
+.grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.card { background: #fff; border: 1px solid #ddd; padding: 8px; }
+.card img, .sem-foto { width: 100%; aspect-ratio: 4/3; object-fit: cover; background: #eee; display: block; }
+.sem-foto { display: flex; align-items: center; justify-content: center; color: #888; }
+fieldset { margin-bottom: 12px; background: #fff; }
+label { display: inline-block; margin: 4px 10px 4px 0; }
+input, select, textarea, button { font: inherit; padding: 4px 6px; }
+textarea { width: 100%; box-sizing: border-box; }
+table { border-collapse: collapse; width: 100%; background: #fff; }
+td, th { border: 1px solid #ddd; padding: 4px 6px; text-align: left; font-size: 14px; }
+.fotos { display: flex; gap: 8px; flex-wrap: wrap; }
+.fotos figure { margin: 0; border: 1px solid #ccc; padding: 4px; background: #fff; text-align: center; }
+.fotos img { width: 120px; height: 90px; object-fit: cover; display: block; }
+.erro { color: #b00; white-space: pre-wrap; }
+.ok { color: #070; }
+.oculto { display: none; }
+footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #ccc; font-size: 14px; color: #555; white-space: pre-wrap; }
+pre { white-space: pre-wrap; background: #fff; border: 1px solid #ddd; padding: 8px; }

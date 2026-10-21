@@ -1,0 +1,21 @@
+# Python portátil (~120 MB) e ambiente antigo
+python/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Configuração local (tem senhas)
+.env
+
+# MySQL portátil: binários (~420 MB) e dados locais
+mysql/
+
+# Fotos enviadas
+uploads/
+
+# Mensagens da API quando ligada pelo painel
+logs/
+
+# Configuracao local do Claude Code
+.claude/
