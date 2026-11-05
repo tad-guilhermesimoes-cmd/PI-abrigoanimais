@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AmparaPet — Animal (teste)</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<div id="conteudo">Carregando...</div>
+<p class="erro" id="erro"></p>
+
+<script src="comum.js"></script>
+<script>
+nav();
+const id = new URLSearchParams(location.search).get("id");
+
+async function carregar() {
+  try {
+    await opcoes();
+    const a = await api("/api/animais/" + id);
+    document.title = `AmparaPet — ${a.nome}`;
+    const adotado = a.status === "ADOTADO";
+    document.getElementById("conteudo").innerHTML = `
+      <h1>${esc(a.nome)}</h1>
+      <div class="fotos">${a.fotos.map(f => `<a href="${f.url}" target="_blank"><img src="${f.miniatura_url}" alt="Foto de ${esc(a.nome)}"></a>`).join("") || "Sem fotos"}</div>
+      <table>
+        <tr><th>Status</th><td>${rotulo("status", a.status)}</td></tr>
+        <tr><th>Espécie / Raça</th><td>${rotulo("especie", a.especie)} / ${esc(a.raca)}</td></tr>
+        <tr><th>Sexo</th><td>${rotulo("sexo", a.sexo)}</td></tr>
+        <tr><th>Idade</th><td>${a.idade || "-"}</td></tr>
+        <tr><th>Porte</th><td>${rotulo("porte", a.porte)}</td></tr>
+        <tr><th>Cor</th><td>${esc(a.cor) || "-"}</td></tr>
+        <tr><th>Vacinado</th><td>${simNao(a.vacinado)} ${a.vacinas_detalhes ? "— " + esc(a.vacinas_detalhes) : ""}</td></tr>
+        <tr><th>Castrado</th><td>${simNao(a.castrado)}</td></tr>
+        <tr><th>Comportamento</th><td>${esc(a.comportamento) || "-"}</td></tr>
+        <tr><th>Necessidades especiais</th><td>${esc(a.necessidades_especiais) || "-"}</td></tr>
+        <tr><th>Descrição</th><td>${esc(a.descricao) || "-"}</td></tr>
+      </table>
+      <p>
+        ${adotado ? "<b>Este animal já foi adotado!</b>" : `<button id="interesse">Tenho interesse (WhatsApp)</button>`}
+        <a href="${a.links.compartilhar_whatsapp}" target="_blank">Compartilhar no WhatsApp</a>
+        <button id="copiar">Copiar link</button>
+        <span id="msg" class="ok"></span>
+      </p>`;
+    if (!adotado) document.getElementById("interesse").onclick = async () => {
+      try {
+        const r = await api(`/api/animais/${id}/interesse`, { method: "POST" });
+        if (r.whatsapp_url) window.open(r.whatsapp_url, "_blank");
+        else alert("O WhatsApp do abrigo ainda não foi configurado na área administrativa.");
+      } catch (e) { document.getElementById("erro").textContent = e.message; }
+    };
+    document.getElementById("copiar").onclick = async () => {
+      await navigator.clipboard.writeText(a.links.pagina);
+      document.getElementById("msg").textContent = "Link copiado: " + a.links.pagina;
+    };
+  } catch (e) {
+    document.getElementById("conteudo").textContent = "";
+    document.getElementById("erro").textContent = e.message;
+  }
+}
+carregar();
+rodape();
+</script>
+</body>
+</html>

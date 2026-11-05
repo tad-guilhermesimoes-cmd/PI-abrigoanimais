@@ -1,0 +1,12 @@
+bcrypt==5.0.0
+cryptography==50.0.2
+fastapi==0.148.0
+httpx==0.28.1
+pillow==13.0.0
+PyMySQL==1.2.3
+pytest==9.1.1
+python-dotenv==1.2.4
+python-multipart==0.0.32
+SQLAlchemy==2.1.5
+uvicorn[standard]==0.54.0
+email-validator==2.3.0
